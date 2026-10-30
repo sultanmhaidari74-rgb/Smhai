@@ -67,8 +67,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_text = update.message.text
 
-    await update.message.chat.send_action("typing")
-
+await context.bot.send_chat_action(
+    chat_id=update.effective_chat.id,
+    action="typing"
+)
     history = user_memory.get(user_id, [])
 
     history.append(
