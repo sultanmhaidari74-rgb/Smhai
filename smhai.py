@@ -176,7 +176,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 ),
             ),
 
-            timeout=30,
+            timeout=90,
         )
 
         answer = response.text or "متأسفانه پاسخی دریافت نکردم."
