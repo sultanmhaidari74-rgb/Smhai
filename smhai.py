@@ -1,3 +1,4 @@
+
 import os
 import logging
 
@@ -13,19 +14,25 @@ from telegram.ext import (
 from google import genai
 from google.genai import types
 
-# Load environment variables
 load_dotenv()
 
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET")
+RENDER_URL = os.getenv("RENDER_EXTERNAL_URL")
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    level=logging.INFO,
+)
 logger = logging.getLogger(__name__)
 
-# Initialize Gemini
 if not TELEGRAM_TOKEN or not GEMINI_API_KEY:
-    raise ValueError("API keys are missing. Check your .env file.")
+    raise ValueError("Missing Telegram or Gemini API key.")
+
+if not WEBHOOK_SECRET or not RENDER_URL:
+    raise ValueError("Missing webhook configuration.")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
@@ -58,10 +65,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_memory.pop(user_id, None)
-
-    await update.message.reply_text(
-        "حافظه گفتگوی شما پاک شد. 🧹"
-    )
+    await update.message.reply_text("حافظه گفتگوی شما پاک شد. 🧹")
 
 async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -69,7 +73,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_chat_action(
         chat_id=update.effective_chat.id,
-        action="typing"
+        action="typing",
     )
 
     history = user_memory.get(user_id, [])
@@ -77,7 +81,7 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     history.append(
         types.Content(
             role="user",
-            parts=[types.Part.from_text(text=user_text)]
+            parts=[types.Part.from_text(text=user_text)],
         )
     )
 
@@ -97,11 +101,10 @@ async def chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         history.append(
             types.Content(
                 role="model",
-                parts=[types.Part.from_text(text=answer)]
+                parts=[types.Part.from_text(text=answer)],
             )
         )
 
-        # Keep the latest conversation turns
         user_memory[user_id] = history[-20:]
 
         for i in range(0, len(answer), 4000):
@@ -119,13 +122,18 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("reset", reset_command))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, chat))
 
-    app.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, chat)
+    port = int(os.environ.get("PORT", "10000"))
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        url_path="telegram",
+        webhook_url=f"{RENDER_URL.rstrip('/')}/telegram",
+        secret_token=WEBHOOK_SECRET,
     )
-
-    print("Sultan AI is running...")
-    app.run_polling()
 
 if __name__ == "__main__":
     main()
+    
